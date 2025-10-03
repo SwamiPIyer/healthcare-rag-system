@@ -3,6 +3,7 @@
 <head>
     <title>Healthcare RAG</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         .upload-zone {
             border: 3px dashed #0d6efd;
@@ -27,80 +28,201 @@
             margin-bottom: 0.5rem;
             border-radius: 5px;
         }
+        .metric-card {
+            text-align: center;
+            padding: 1.5rem;
+            border-radius: 10px;
+            transition: transform 0.2s;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
     </style>
 </head>
 <body>
     <div class="container mt-5">
         <h1>🏥 Healthcare RAG System</h1>
-        <p class="text-muted">Upload PDFs, ask questions, get AI-powered answers</p>
+        <p class="text-muted">Upload PDFs, ask questions, evaluate performance</p>
         
-        <!-- Data Source Selection -->
-        <div class="card mt-4">
-            <div class="card-header">
-                <h5>Step 1: Choose Data Source</h5>
-            </div>
-            <div class="card-body">
-                <div class="btn-group" role="group">
-                    <input type="radio" class="btn-check" name="source" id="source-sample" checked>
-                    <label class="btn btn-outline-primary" for="source-sample" onclick="showSource('sample')">
-                        📄 Sample Data
-                    </label>
-                    <input type="radio" class="btn-check" name="source" id="source-pdf">
-                    <label class="btn btn-outline-success" for="source-pdf" onclick="showSource('pdf')">
-                        📎 Upload PDF
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Sample Data Section -->
-        <div id="section-sample" class="card mt-3">
-            <div class="card-body">
-                <h6>📄 Sample Healthcare Articles</h6>
-                <p>Load 3 pre-loaded medical articles for testing</p>
-                <button class="btn btn-primary" onclick="loadData()">Load Sample Data</button>
-            </div>
-        </div>
-
-        <!-- PDF Upload Section -->
-        <div id="section-pdf" class="card mt-3" style="display:none;">
-            <div class="card-body">
-                <h6>📎 Upload Your PDF Document</h6>
-                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('pdf-input').click()">
-                    <i style="font-size: 3rem; color: #0d6efd;">📄</i>
-                    <h5 class="mt-3">Click to Upload or Drag & Drop PDF</h5>
-                    <p class="text-muted">Maximum file size: 50MB</p>
-                    <input type="file" id="pdf-input" accept=".pdf" style="display:none;" onchange="handleFileSelect(event)">
-                </div>
-                <div id="pdf-info" class="alert alert-success mt-3" style="display:none;">
-                    <strong>✓ PDF Loaded:</strong> <span id="pdf-name"></span><br>
-                    <small>Pages: <span id="pdf-pages"></span> | Size: <span id="pdf-size"></span> KB</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- Build Index Section -->
-        <div id="build-section" class="card mt-3" style="display:none;">
-            <div class="card-header">
-                <h5>Step 2: Build Index</h5>
-            </div>
-            <div class="card-body text-center">
-                <button class="btn btn-success btn-lg" onclick="buildIndex()">
-                    🔨 Build Vector Index
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs mt-4" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="data-tab" data-bs-toggle="tab" data-bs-target="#data-panel" type="button">
+                    📄 Data & Index
                 </button>
-                <p class="text-muted mt-2">This will take 20-30 seconds</p>
-            </div>
-        </div>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="query-tab" data-bs-toggle="tab" data-bs-target="#query-panel" type="button">
+                    🔍 Query
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="eval-tab" data-bs-toggle="tab" data-bs-target="#eval-panel" type="button">
+                    📊 Evaluate
+                </button>
+            </li>
+        </ul>
 
-        <!-- Query Section -->
-        <div id="query-section" class="card mt-4" style="display:none;">
-            <div class="card-header">
-                <h5>Step 3: Ask Questions</h5>
+        <!-- Tab Content -->
+        <div class="tab-content mt-3">
+            <!-- DATA & INDEX TAB -->
+            <div class="tab-pane fade show active" id="data-panel">
+                <!-- Data Source Selection -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Step 1: Choose Data Source</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="source" id="source-sample" checked>
+                            <label class="btn btn-outline-primary" for="source-sample" onclick="showSource('sample')">
+                                📄 Sample Data
+                            </label>
+                            <input type="radio" class="btn-check" name="source" id="source-pdf">
+                            <label class="btn btn-outline-success" for="source-pdf" onclick="showSource('pdf')">
+                                📎 Upload PDF
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sample Data Section -->
+                <div id="section-sample" class="card mt-3">
+                    <div class="card-body">
+                        <h6>📄 Sample Healthcare Articles</h6>
+                        <p>Load 3 pre-loaded medical articles for testing</p>
+                        <button class="btn btn-primary" onclick="loadData()">Load Sample Data</button>
+                    </div>
+                </div>
+
+                <!-- PDF Upload Section -->
+                <div id="section-pdf" class="card mt-3" style="display:none;">
+                    <div class="card-body">
+                        <h6>📎 Upload Your PDF Document</h6>
+                        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('pdf-input').click()">
+                            <i style="font-size: 3rem; color: #0d6efd;">📄</i>
+                            <h5 class="mt-3">Click to Upload or Drag & Drop PDF</h5>
+                            <p class="text-muted">Maximum file size: 50MB</p>
+                            <input type="file" id="pdf-input" accept=".pdf" style="display:none;" onchange="handleFileSelect(event)">
+                        </div>
+                        <div id="pdf-info" class="alert alert-success mt-3" style="display:none;">
+                            <strong>✓ PDF Loaded:</strong> <span id="pdf-name"></span><br>
+                            <small>Pages: <span id="pdf-pages"></span> | Size: <span id="pdf-size"></span> KB</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Build Index Section -->
+                <div id="build-section" class="card mt-3" style="display:none;">
+                    <div class="card-header">
+                        <h5>Step 2: Build Index</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <button class="btn btn-success btn-lg" onclick="buildIndex()">
+                            🔨 Build Vector Index
+                        </button>
+                        <p class="text-muted mt-2">This will take 20-30 seconds</p>
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <input type="text" id="query" class="form-control form-control-lg" placeholder="Ask a question about the documents...">
-                <button class="btn btn-primary btn-lg mt-3" onclick="query()">🔍 Submit Query</button>
-                <div id="result" class="mt-4"></div>
+
+            <!-- QUERY TAB -->
+            <div class="tab-pane fade" id="query-panel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Ask Questions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info" id="query-alert">
+                            <i class="bi bi-info-circle"></i> Please build the index first in the "Data & Index" tab.
+                        </div>
+                        <input type="text" id="query" class="form-control form-control-lg" placeholder="Ask a question about the documents...">
+                        <button class="btn btn-primary btn-lg mt-3" onclick="query()">🔍 Submit Query</button>
+                        <div id="result" class="mt-4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EVALUATION TAB -->
+            <div class="tab-pane fade" id="eval-panel">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📊 RAGAS Evaluation</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <strong>About RAGAS Metrics:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li><strong>Faithfulness:</strong> How factually accurate are the answers?</li>
+                                <li><strong>Answer Relevancy:</strong> How relevant are answers to questions?</li>
+                                <li><strong>Context Precision:</strong> How precise is the retrieved context?</li>
+                                <li><strong>Context Recall:</strong> How complete is the retrieved context?</li>
+                            </ul>
+                        </div>
+
+                        <div class="text-center mt-3">
+                            <button class="btn btn-primary btn-lg" onclick="runEvaluation()" id="eval-button">
+                                ▶️ Run RAGAS Evaluation
+                            </button>
+                            <p class="text-muted mt-2">Evaluates system performance with test questions</p>
+                        </div>
+
+                        <!-- Evaluation Results -->
+                        <div id="eval-results" class="mt-4" style="display:none;">
+                            <h5 class="mb-3">Results:</h5>
+                            
+                            <!-- Metrics Cards -->
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <div class="card metric-card bg-primary text-white">
+                                        <div class="card-body">
+                                            <h6>Faithfulness</h6>
+                                            <h2 id="metric-faith">-</h2>
+                                            <span id="status-faith"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card metric-card bg-success text-white">
+                                        <div class="card-body">
+                                            <h6>Answer Relevancy</h6>
+                                            <h2 id="metric-relevancy">-</h2>
+                                            <span id="status-relevancy"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card metric-card bg-warning text-dark">
+                                        <div class="card-body">
+                                            <h6>Context Precision</h6>
+                                            <h2 id="metric-precision">-</h2>
+                                            <span id="status-precision"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="card metric-card bg-info text-white">
+                                        <div class="card-body">
+                                            <h6>Context Recall</h6>
+                                            <h2 id="metric-recall">-</h2>
+                                            <span id="status-recall"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Chart -->
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <h6>Performance Overview</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="eval-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -108,10 +230,12 @@
         <div id="status-messages" class="mt-3"></div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const API = "http://localhost:5001/api";
         let dataLoaded = false;
         let indexBuilt = false;
+        let evalChart = null;
 
         // Show/hide sections based on data source
         function showSource(source) {
@@ -191,13 +315,11 @@
                     dataLoaded = true;
                     showStatus('✓ ' + data.message, 'success');
                     
-                    // Show PDF info
                     document.getElementById('pdf-name').textContent = data.pdf_info.filename;
                     document.getElementById('pdf-pages').textContent = data.pdf_info.num_pages;
                     document.getElementById('pdf-size').textContent = data.pdf_info.file_size_kb.toFixed(2);
                     document.getElementById('pdf-info').style.display = 'block';
                     
-                    // Show build section
                     document.getElementById('build-section').style.display = 'block';
                 } else {
                     showStatus('✗ Error: ' + data.error, 'danger');
@@ -222,9 +344,8 @@
                 
                 if (data.success) {
                     indexBuilt = true;
-                    showStatus('✓ ' + data.message + ' - Ready for queries!', 'success');
-                    document.getElementById('query-section').style.display = 'block';
-                    document.getElementById('query-section').scrollIntoView({ behavior: 'smooth' });
+                    showStatus('✓ ' + data.message + ' - Ready for queries and evaluation!', 'success');
+                    document.getElementById('query-alert').style.display = 'none';
                 } else {
                     showStatus('✗ Error: ' + data.error, 'danger');
                 }
@@ -236,7 +357,7 @@
         // Query system
         async function query() {
             if (!indexBuilt) {
-                showStatus('✗ Please build the index first', 'warning');
+                showStatus('✗ Please build the index first in the Data & Index tab', 'warning');
                 return;
             }
 
@@ -259,7 +380,7 @@
                 
                 if (data.success) {
                     displayAnswer(data.data);
-                    showStatus('', ''); // Clear status
+                    showStatus('', '');
                 } else {
                     showStatus('✗ Error: ' + data.error, 'danger');
                 }
@@ -287,6 +408,122 @@
             }
 
             document.getElementById("result").innerHTML = html;
+        }
+
+        // Run RAGAS Evaluation
+        async function runEvaluation() {
+            if (!indexBuilt) {
+                showStatus('✗ Please build the index first in the Data & Index tab', 'warning');
+                return;
+            }
+
+            try {
+                const button = document.getElementById('eval-button');
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running evaluation...';
+                
+                showStatus('Running RAGAS evaluation... This may take 1-2 minutes', 'info');
+                
+                const res = await fetch(API + "/evaluate", {method: "POST"});
+                const data = await res.json();
+                
+                if (data.success) {
+                    displayEvaluationResults(data.data);
+                    showStatus('✓ Evaluation complete!', 'success');
+                } else {
+                    showStatus('✗ Error: ' + data.error, 'danger');
+                }
+                
+                button.disabled = false;
+                button.innerHTML = '▶️ Run RAGAS Evaluation';
+            } catch (error) {
+                showStatus('✗ Error: ' + error.message, 'danger');
+                document.getElementById('eval-button').disabled = false;
+                document.getElementById('eval-button').innerHTML = '▶️ Run RAGAS Evaluation';
+            }
+        }
+
+        // Display evaluation results
+        function displayEvaluationResults(results) {
+            document.getElementById('metric-faith').textContent = results.faithfulness.toFixed(3);
+            document.getElementById('metric-relevancy').textContent = results.answer_relevancy.toFixed(3);
+            document.getElementById('metric-precision').textContent = results.context_precision.toFixed(3);
+            document.getElementById('metric-recall').textContent = results.context_recall.toFixed(3);
+
+            // Add status badges
+            const metrics = {
+                'faith': results.faithfulness,
+                'relevancy': results.answer_relevancy,
+                'precision': results.context_precision,
+                'recall': results.context_recall
+            };
+
+            Object.entries(metrics).forEach(([key, value]) => {
+                const status = getScoreStatus(value);
+                document.getElementById('status-' + key).innerHTML = '<small>' + status + '</small>';
+            });
+
+            // Create chart
+            createEvaluationChart(results);
+
+            document.getElementById('eval-results').style.display = 'block';
+        }
+
+        // Get score status
+        function getScoreStatus(score) {
+            if (score >= 0.8) return '✓ Excellent';
+            if (score >= 0.6) return '○ Good';
+            if (score >= 0.4) return '△ Fair';
+            return '✗ Needs Improvement';
+        }
+
+        // Create evaluation chart
+        function createEvaluationChart(data) {
+            const ctx = document.getElementById('eval-chart');
+            
+            if (evalChart) {
+                evalChart.destroy();
+            }
+
+            evalChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Faithfulness', 'Answer Relevancy', 'Context Precision', 'Context Recall'],
+                    datasets: [{
+                        label: 'Score',
+                        data: [
+                            data.faithfulness,
+                            data.answer_relevancy,
+                            data.context_precision,
+                            data.context_recall
+                        ],
+                        backgroundColor: [
+                            'rgba(13, 110, 253, 0.8)',
+                            'rgba(25, 135, 84, 0.8)',
+                            'rgba(255, 193, 7, 0.8)',
+                            'rgba(13, 202, 240, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            ticks: { stepSize: 0.2 }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'RAGAS Evaluation Metrics',
+                            font: { size: 16 }
+                        }
+                    }
+                }
+            });
         }
 
         // Show status messages

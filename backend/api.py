@@ -58,19 +58,16 @@ def upload_pdf():
         
         print('Processing file:', file.filename)
         
-        # Save and process PDF
         filename = secure_filename(file.filename)
         file_data = file.read()
         filepath = pdf_processor.save_uploaded_file(file_data, filename)
         
         print('File saved to:', filepath)
         
-        # Load PDF documents
         documents = pdf_processor.load_pdf(filepath)
         
         print('Loaded', len(documents), 'pages')
         
-        # Convert to data format
         data = []
         for i, doc in enumerate(documents):
             data.append({
@@ -83,7 +80,6 @@ def upload_pdf():
         app_state['current_data'] = data
         app_state['data_source'] = 'pdf'
         
-        # Get PDF info
         pdf_info = {
             'filename': filename,
             'num_pages': len(documents),
@@ -155,9 +151,50 @@ def query_system():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/evaluate', methods=['POST'])
+def run_evaluation():
+    try:
+        if not app_state['index_built']:
+            return jsonify({'success': False, 'error': 'Index not built. Please build the index first.'}), 400
+        
+        print('Starting RAGAS evaluation...')
+        
+        # Get test cases
+        test_cases = evaluator.create_test_cases()
+        questions = test_cases['questions']
+        ground_truths = test_cases['ground_truths']
+        
+        print('Running queries for evaluation...')
+        
+        # Run queries
+        results = rag_system.batch_query(questions)
+        
+        # Extract answers and contexts
+        answers = [r['answer'] for r in results]
+        contexts = [[s['text_snippet'] for s in r['sources']] for r in results]
+        
+        print('Evaluating with RAGAS...')
+        
+        # Run evaluation
+        eval_results = evaluator.evaluate(questions, answers, contexts, ground_truths)
+        
+        print('Evaluation complete:', eval_results)
+        
+        return jsonify({
+            'success': True,
+            'data': eval_results,
+            'message': 'Evaluation completed successfully'
+        })
+        
+    except Exception as e:
+        print('Error during evaluation:', str(e))
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     print('=' * 60)
-    print('HEALTHCARE RAG SYSTEM WITH PDF UPLOAD')
+    print('HEALTHCARE RAG SYSTEM WITH EVALUATION')
     print('=' * 60)
     print('http://localhost:5001')
     print('=' * 60)
