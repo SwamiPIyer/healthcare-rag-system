@@ -1,306 +1,421 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Healthcare RAG</title>
+    <title>Healthcare RAG - Multi-Document</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
+        :root {
+            --primary-color: #0d6efd;
+            --success-color: #198754;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+        }
+        
+        body { background-color: #f8f9fa; }
+        
         .upload-zone {
-            border: 3px dashed #0d6efd;
+            border: 3px dashed var(--primary-color);
             border-radius: 10px;
             padding: 2rem;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s;
+            background: white;
         }
+        
         .upload-zone:hover {
             background-color: #f8f9fa;
             border-color: #0a58ca;
+            transform: translateY(-2px);
         }
+        
         .upload-zone.dragover {
             background-color: #e7f1ff;
             border-color: #0a58ca;
+            transform: scale(1.02);
         }
+        
+        .document-card {
+            transition: all 0.3s;
+            border-left: 4px solid var(--primary-color);
+            background: white;
+        }
+        
+        .document-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .document-card.selected {
+            border-left-color: var(--success-color);
+            background-color: #f0f9ff;
+        }
+        
         .source-card {
-            background-color: #f8f9fa;
-            border-left: 4px solid #0d6efd;
-            padding: 1rem;
-            margin-bottom: 0.5rem;
-            border-radius: 5px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
         }
+        
+        .source-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+        }
+        
+        .source-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        
+        .score-badge {
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        .score-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.3);
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .score-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        .highlight-text {
+            background: linear-gradient(120deg, #fef3c7 0%, #fde68a 100%);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+        
         .metric-card {
             text-align: center;
             padding: 1.5rem;
             border-radius: 10px;
             transition: transform 0.2s;
+            background: white;
         }
+        
         .metric-card:hover {
             transform: translateY(-5px);
+        }
+        
+        .badge-pill {
+            padding: 0.35rem 0.75rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+        }
+        
+        .doc-selector {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .answer-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+        
+        .comparison-view {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        
+        .page-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <h1>🏥 Healthcare RAG System</h1>
-        <p class="text-muted">Upload PDFs, ask questions, evaluate performance</p>
-        
-        <!-- Navigation Tabs -->
-        <ul class="nav nav-tabs mt-4" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="data-tab" data-bs-toggle="tab" data-bs-target="#data-panel" type="button">
-                    📄 Data & Index
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="query-tab" data-bs-toggle="tab" data-bs-target="#query-panel" type="button">
-                    🔍 Query
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="eval-tab" data-bs-toggle="tab" data-bs-target="#eval-panel" type="button">
-                    📊 Evaluate
-                </button>
-            </li>
-        </ul>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">🏥 Healthcare RAG - Multi-Document System</span>
+            <span class="badge bg-light text-primary" id="doc-counter">0 Documents</span>
+        </div>
+    </nav>
 
-        <!-- Tab Content -->
-        <div class="tab-content mt-3">
-            <!-- DATA & INDEX TAB -->
-            <div class="tab-pane fade show active" id="data-panel">
-                <!-- Data Source Selection -->
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Step 1: Choose Data Source</h5>
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- LEFT SIDEBAR - Document Library -->
+            <div class="col-md-3">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-folder2-open"></i> Document Library</h5>
                     </div>
-                    <div class="card-body">
-                        <div class="btn-group" role="group">
-                            <input type="radio" class="btn-check" name="source" id="source-sample" checked>
-                            <label class="btn btn-outline-primary" for="source-sample" onclick="showSource('sample')">
-                                📄 Sample Data
-                            </label>
-                            <input type="radio" class="btn-check" name="source" id="source-pdf">
-                            <label class="btn btn-outline-success" for="source-pdf" onclick="showSource('pdf')">
-                                📎 Upload PDF
-                            </label>
+                    <div class="card-body doc-selector" id="document-library">
+                        <div class="text-center text-muted py-4">
+                            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                            <p class="mt-2">No documents loaded</p>
                         </div>
                     </div>
-                </div>
-
-                <!-- Sample Data Section -->
-                <div id="section-sample" class="card mt-3">
-                    <div class="card-body">
-                        <h6>📄 Sample Healthcare Articles</h6>
-                        <p>Load 3 pre-loaded medical articles for testing</p>
-                        <button class="btn btn-primary" onclick="loadData()">Load Sample Data</button>
-                    </div>
-                </div>
-
-                <!-- PDF Upload Section -->
-                <div id="section-pdf" class="card mt-3" style="display:none;">
-                    <div class="card-body">
-                        <h6>📎 Upload Your PDF Document</h6>
-                        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('pdf-input').click()">
-                            <i style="font-size: 3rem; color: #0d6efd;">📄</i>
-                            <h5 class="mt-3">Click to Upload or Drag & Drop PDF</h5>
-                            <p class="text-muted">Maximum file size: 50MB</p>
-                            <input type="file" id="pdf-input" accept=".pdf" style="display:none;" onchange="handleFileSelect(event)">
-                        </div>
-                        <div id="pdf-info" class="alert alert-success mt-3" style="display:none;">
-                            <strong>✓ PDF Loaded:</strong> <span id="pdf-name"></span><br>
-                            <small>Pages: <span id="pdf-pages"></span> | Size: <span id="pdf-size"></span> KB</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Build Index Section -->
-                <div id="build-section" class="card mt-3" style="display:none;">
-                    <div class="card-header">
-                        <h5>Step 2: Build Index</h5>
-                    </div>
-                    <div class="card-body text-center">
-                        <button class="btn btn-success btn-lg" onclick="buildIndex()">
-                            🔨 Build Vector Index
+                    <div class="card-footer">
+                        <button class="btn btn-sm btn-outline-danger w-100" onclick="clearAll()">
+                            <i class="bi bi-trash"></i> Clear All
                         </button>
-                        <p class="text-muted mt-2">This will take 20-30 seconds</p>
                     </div>
                 </div>
             </div>
 
-            <!-- QUERY TAB -->
-            <div class="tab-pane fade" id="query-panel">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Ask Questions</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info" id="query-alert">
-                            <i class="bi bi-info-circle"></i> Please build the index first in the "Data & Index" tab.
-                        </div>
-                        <input type="text" id="query" class="form-control form-control-lg" placeholder="Ask a question about the documents...">
-                        <button class="btn btn-primary btn-lg mt-3" onclick="query()">🔍 Submit Query</button>
-                        <div id="result" class="mt-4"></div>
-                    </div>
-                </div>
-            </div>
+            <!-- MAIN CONTENT -->
+            <div class="col-md-9">
+                <!-- Navigation Tabs -->
+                <ul class="nav nav-pills mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="upload-tab" data-bs-toggle="pill" data-bs-target="#upload-panel">
+                            <i class="bi bi-cloud-upload"></i> Upload
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="query-tab" data-bs-toggle="pill" data-bs-target="#query-panel">
+                            <i class="bi bi-search"></i> Query
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="eval-tab" data-bs-toggle="pill" data-bs-target="#eval-panel">
+                            <i class="bi bi-bar-chart"></i> Evaluate
+                        </button>
+                    </li>
+                </ul>
 
-            <!-- EVALUATION TAB -->
-            <div class="tab-pane fade" id="eval-panel">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>📊 RAGAS Evaluation</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info">
-                            <strong>About RAGAS Metrics:</strong>
-                            <ul class="mb-0 mt-2">
-                                <li><strong>Faithfulness:</strong> How factually accurate are the answers?</li>
-                                <li><strong>Answer Relevancy:</strong> How relevant are answers to questions?</li>
-                                <li><strong>Context Precision:</strong> How precise is the retrieved context?</li>
-                                <li><strong>Context Recall:</strong> How complete is the retrieved context?</li>
-                            </ul>
-                        </div>
-
-                        <div class="text-center mt-3">
-                            <button class="btn btn-primary btn-lg" onclick="runEvaluation()" id="eval-button">
-                                ▶️ Run RAGAS Evaluation
-                            </button>
-                            <p class="text-muted mt-2">Evaluates system performance with test questions</p>
-                        </div>
-
-                        <!-- Evaluation Results -->
-                        <div id="eval-results" class="mt-4" style="display:none;">
-                            <h5 class="mb-3">Results:</h5>
-                            
-                            <!-- Metrics Cards -->
-                            <div class="row">
-                                <div class="col-md-3 mb-3">
-                                    <div class="card metric-card bg-primary text-white">
-                                        <div class="card-body">
-                                            <h6>Faithfulness</h6>
-                                            <h2 id="metric-faith">-</h2>
-                                            <span id="status-faith"></span>
-                                        </div>
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- UPLOAD TAB -->
+                    <div class="tab-pane fade show active" id="upload-panel">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card shadow-sm">
+                                    <div class="card-header">
+                                        <h5><i class="bi bi-file-earmark-pdf"></i> Upload PDFs</h5>
                                     </div>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <div class="card metric-card bg-success text-white">
-                                        <div class="card-body">
-                                            <h6>Answer Relevancy</h6>
-                                            <h2 id="metric-relevancy">-</h2>
-                                            <span id="status-relevancy"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <div class="card metric-card bg-warning text-dark">
-                                        <div class="card-body">
-                                            <h6>Context Precision</h6>
-                                            <h2 id="metric-precision">-</h2>
-                                            <span id="status-precision"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 mb-3">
-                                    <div class="card metric-card bg-info text-white">
-                                        <div class="card-body">
-                                            <h6>Context Recall</h6>
-                                            <h2 id="metric-recall">-</h2>
-                                            <span id="status-recall"></span>
+                                    <div class="card-body">
+                                        <div class="upload-zone" id="upload-zone">
+                                            <i class="bi bi-cloud-arrow-up" style="font-size: 4rem; color: var(--primary-color);"></i>
+                                            <h5 class="mt-3">Drop PDFs here or click to browse</h5>
+                                            <p class="text-muted">Upload multiple PDFs at once</p>
+                                            <input type="file" id="pdf-input" accept=".pdf" multiple style="display:none;">
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Chart -->
-                            <div class="card mt-3">
-                                <div class="card-header">
-                                    <h6>Performance Overview</h6>
+                            <div class="col-md-6">
+                                <div class="card shadow-sm">
+                                    <div class="card-header">
+                                        <h5><i class="bi bi-file-text"></i> Sample Data</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <p>Load pre-configured medical articles for testing</p>
+                                        <button class="btn btn-primary w-100" onclick="loadSampleData()">
+                                            <i class="bi bi-download"></i> Load Sample Data
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="card-body">
-                                    <canvas id="eval-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="card shadow-sm mt-3">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-hammer"></i> Build Index</h5>
+                            </div>
+                            <div class="card-body text-center">
+                                <p class="text-muted">Select documents from the library, then build the vector index</p>
+                                <button class="btn btn-success btn-lg" onclick="buildIndex()" id="build-btn">
+                                    <i class="bi bi-gear"></i> Build Vector Index
+                                </button>
+                                <div id="build-status" class="mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QUERY TAB -->
+                    <div class="tab-pane fade" id="query-panel">
+                        <div class="card shadow-sm">
+                            <div class="card-body">
+                                <div class="alert alert-info" id="query-alert">
+                                    <i class="bi bi-info-circle"></i> Build the index first, then ask questions across your documents
+                                </div>
+                                
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" class="form-control" id="query-input" placeholder="Ask a question across all selected documents...">
+                                    <button class="btn btn-primary" onclick="submitQuery()">
+                                        <i class="bi bi-send"></i> Query
+                                    </button>
+                                </div>
+
+                                <div class="mt-3">
+                                    <span class="badge bg-secondary" id="selected-docs-badge">0 documents selected</span>
+                                </div>
+
+                                <div id="query-results" class="mt-4"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- EVALUATION TAB -->
+                    <div class="tab-pane fade" id="eval-panel">
+                        <div class="card shadow-sm">
+                            <div class="card-header">
+                                <h5><i class="bi bi-bar-chart"></i> RAGAS Evaluation</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    <strong>Evaluation Metrics:</strong>
+                                    <ul class="mb-0 mt-2">
+                                        <li><strong>Faithfulness:</strong> Factual accuracy of answers</li>
+                                        <li><strong>Answer Relevancy:</strong> How well answers match questions</li>
+                                        <li><strong>Context Precision:</strong> Quality of retrieved context</li>
+                                        <li><strong>Context Recall:</strong> Completeness of retrieved context</li>
+                                    </ul>
+                                </div>
+
+                                <div class="text-center">
+                                    <button class="btn btn-primary btn-lg" onclick="runEvaluation()" id="eval-btn">
+                                        <i class="bi bi-play-circle"></i> Run Evaluation
+                                    </button>
+                                </div>
+
+                                <div id="eval-results" class="mt-4" style="display:none;">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="card metric-card bg-primary text-white">
+                                                <div class="card-body">
+                                                    <h6>Faithfulness</h6>
+                                                    <h2 id="metric-faith">-</h2>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card metric-card bg-success text-white">
+                                                <div class="card-body">
+                                                    <h6>Relevancy</h6>
+                                                    <h2 id="metric-relevancy">-</h2>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card metric-card bg-warning text-dark">
+                                                <div class="card-body">
+                                                    <h6>Precision</h6>
+                                                    <h2 id="metric-precision">-</h2>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card metric-card bg-info text-white">
+                                                <div class="card-body">
+                                                    <h6>Recall</h6>
+                                                    <h2 id="metric-recall">-</h2>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card mt-3">
+                                        <div class="card-body">
+                                            <canvas id="eval-chart"></canvas>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Status Messages -->
+                <div id="status-messages" class="mt-3"></div>
             </div>
         </div>
-
-        <!-- Status Messages -->
-        <div id="status-messages" class="mt-3"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const API = "http://localhost:5001/api";
-        let dataLoaded = false;
+        let documents = [];
+        let selectedDocs = [];
         let indexBuilt = false;
         let evalChart = null;
 
-        // Show/hide sections based on data source
-        function showSource(source) {
-            document.getElementById('section-sample').style.display = source === 'sample' ? 'block' : 'none';
-            document.getElementById('section-pdf').style.display = source === 'pdf' ? 'block' : 'none';
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupUploadZone();
+            loadDocuments();
+            
+            document.getElementById('query-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') submitQuery();
+            });
+        });
+
+        // Setup drag & drop
+        function setupUploadZone() {
+            const zone = document.getElementById('upload-zone');
+            const input = document.getElementById('pdf-input');
+
+            zone.onclick = () => input.click();
+
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('dragover');
+            });
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                handleFiles(e.dataTransfer.files);
+            });
+
+            input.addEventListener('change', (e) => {
+                handleFiles(e.target.files);
+            });
         }
 
-        // Load sample data
-        async function loadData() {
-            try {
-                showStatus('Loading sample data...', 'info');
-                const res = await fetch(API + "/data/sample", {method: "POST"});
-                const data = await res.json();
-                
-                if (data.success) {
-                    dataLoaded = true;
-                    showStatus('✓ ' + data.message, 'success');
-                    document.getElementById('build-section').style.display = 'block';
-                } else {
-                    showStatus('✗ Error: ' + data.error, 'danger');
+        // Handle file uploads
+        async function handleFiles(files) {
+            for (let file of files) {
+                if (file.type === 'application/pdf') {
+                    await uploadPDF(file);
                 }
-            } catch (error) {
-                showStatus('✗ Error: ' + error.message, 'danger');
             }
         }
 
-        // PDF Upload - Drag and Drop
-        const uploadZone = document.getElementById('upload-zone');
-        
-        uploadZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadZone.classList.add('dragover');
-        });
-        
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
-        });
-        
-        uploadZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                uploadPDF(files[0]);
-            }
-        });
-
-        // Handle file selection
-        function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                uploadPDF(file);
-            }
-        }
-
-        // Upload PDF
+        // Upload single PDF
         async function uploadPDF(file) {
-            if (!file.name.toLowerCase().endsWith('.pdf')) {
-                showStatus('✗ Please select a PDF file', 'danger');
-                return;
-            }
-
             try {
-                showStatus('Uploading and processing PDF...', 'info');
-                
+                showStatus('Uploading ' + file.name + '...', 'info');
+
                 const formData = new FormData();
                 formData.append('file', file);
 
@@ -312,178 +427,352 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    dataLoaded = true;
                     showStatus('✓ ' + data.message, 'success');
-                    
-                    document.getElementById('pdf-name').textContent = data.pdf_info.filename;
-                    document.getElementById('pdf-pages').textContent = data.pdf_info.num_pages;
-                    document.getElementById('pdf-size').textContent = data.pdf_info.file_size_kb.toFixed(2);
-                    document.getElementById('pdf-info').style.display = 'block';
-                    
-                    document.getElementById('build-section').style.display = 'block';
+                    documents = data.documents;
+                    updateDocumentLibrary();
+                    indexBuilt = false;
                 } else {
-                    showStatus('✗ Error: ' + data.error, 'danger');
-                }
-            } catch (error) {
-                showStatus('✗ Error uploading PDF: ' + error.message, 'danger');
-            }
-        }
-
-        // Build index
-        async function buildIndex() {
-            if (!dataLoaded) {
-                showStatus('✗ Please load data first', 'warning');
-                return;
-            }
-
-            try {
-                showStatus('Building vector index... This will take 20-30 seconds', 'info');
-                
-                const res = await fetch(API + "/index/build", {method: "POST"});
-                const data = await res.json();
-                
-                if (data.success) {
-                    indexBuilt = true;
-                    showStatus('✓ ' + data.message + ' - Ready for queries and evaluation!', 'success');
-                    document.getElementById('query-alert').style.display = 'none';
-                } else {
-                    showStatus('✗ Error: ' + data.error, 'danger');
+                    showStatus('✗ ' + data.error, 'danger');
                 }
             } catch (error) {
                 showStatus('✗ Error: ' + error.message, 'danger');
             }
         }
 
-        // Query system
-        async function query() {
-            if (!indexBuilt) {
-                showStatus('✗ Please build the index first in the Data & Index tab', 'warning');
+        // Load sample data
+        async function loadSampleData() {
+            try {
+                showStatus('Loading sample data...', 'info');
+
+                const res = await fetch(API + '/data/sample', {method: 'POST'});
+                const data = await res.json();
+
+                if (data.success) {
+                    showStatus('✓ ' + data.message, 'success');
+                    documents = data.documents;
+                    selectedDocs = documents.map(d => d.id);
+                    updateDocumentLibrary();
+                    indexBuilt = false;
+                } else {
+                    showStatus('✗ ' + data.error, 'danger');
+                }
+            } catch (error) {
+                showStatus('✗ Error: ' + error.message, 'danger');
+            }
+        }
+
+        // Load documents from server
+        async function loadDocuments() {
+            try {
+                const res = await fetch(API + '/documents');
+                const data = await res.json();
+                if (data.success) {
+                    documents = data.documents;
+                    selectedDocs = data.selected_docs;
+                    updateDocumentLibrary();
+                }
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
+        }
+
+        // Update document library UI
+        function updateDocumentLibrary() {
+            const library = document.getElementById('document-library');
+            document.getElementById('doc-counter').textContent = documents.length + ' Document' + (documents.length !== 1 ? 's' : '');
+
+            if (documents.length === 0) {
+                library.innerHTML = `
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p class="mt-2">No documents loaded</p>
+                    </div>
+                `;
                 return;
             }
 
-            const q = document.getElementById("query").value.trim();
-            if (!q) {
+            let html = '';
+            documents.forEach(doc => {
+                const isSelected = selectedDocs.includes(doc.id);
+                const icon = doc.type === 'pdf' ? 'file-earmark-pdf' : 'file-text';
+                const color = doc.type === 'pdf' ? 'danger' : 'primary';
+
+                html += `
+                    <div class="document-card p-3 mb-2 ${isSelected ? 'selected' : ''}" onclick="toggleDocument('${doc.id}')">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">
+                                    <i class="bi bi-${icon} text-${color}"></i>
+                                    ${doc.name}
+                                </h6>
+                                <small class="text-muted">
+                                    <span class="badge badge-pill bg-secondary">${doc.pages} page${doc.pages !== 1 ? 's' : ''}</span>
+                                    ${doc.type}
+                                </small>
+                            </div>
+                            <div>
+                                <input type="checkbox" class="form-check-input" ${isSelected ? 'checked' : ''} 
+                                       onclick="event.stopPropagation(); toggleDocument('${doc.id}')">
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteDocument('${doc.id}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            library.innerHTML = html;
+            updateSelectedDocsCount();
+        }
+
+        // Toggle document selection
+        async function toggleDocument(docId) {
+            if (selectedDocs.includes(docId)) {
+                selectedDocs = selectedDocs.filter(id => id !== docId);
+            } else {
+                selectedDocs.push(docId);
+            }
+
+            try {
+                const res = await fetch(API + '/documents/select', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({doc_ids: selectedDocs})
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    updateDocumentLibrary();
+                    indexBuilt = false;
+                }
+            } catch (error) {
+                showStatus('✗ Error: ' + error.message, 'danger');
+            }
+        }
+
+        // Delete document
+        async function deleteDocument(docId) {
+            if (!confirm('Delete this document?')) return;
+
+            try {
+                const res = await fetch(API + '/documents/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({doc_id: docId})
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    documents = data.documents;
+                    selectedDocs = selectedDocs.filter(id => id !== docId);
+                    updateDocumentLibrary();
+                    showStatus('✓ Document deleted', 'success');
+                }
+            } catch (error) {
+                showStatus('✗ Error: ' + error.message, 'danger');
+            }
+        }
+
+        // Clear all documents
+        function clearAll() {
+            if (!confirm('Clear all documents?')) return;
+            
+            documents.forEach(doc => deleteDocument(doc.id));
+        }
+
+        // Update selected docs count
+        function updateSelectedDocsCount() {
+            document.getElementById('selected-docs-badge').textContent = 
+                selectedDocs.length + ' document' + (selectedDocs.length !== 1 ? 's' : '') + ' selected';
+        }
+
+        // Build index
+        async function buildIndex() {
+            if (selectedDocs.length === 0) {
+                showStatus('✗ Please select at least one document', 'warning');
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('build-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Building...';
+
+                showStatus('Building index for ' + selectedDocs.length + ' document(s)... This may take 20-30 seconds', 'info');
+
+                const res = await fetch(API + '/index/build', {method: 'POST'});
+                const data = await res.json();
+
+                if (data.success) {
+                    indexBuilt = true;
+                    showStatus('✓ ' + data.message, 'success');
+                    document.getElementById('query-alert').style.display = 'none';
+                } else {
+                    showStatus('✗ ' + data.error, 'danger');
+                }
+
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-gear"></i> Build Vector Index';
+            } catch (error) {
+                showStatus('✗ Error: ' + error.message, 'danger');
+                document.getElementById('build-btn').disabled = false;
+            }
+        }
+
+        // Submit query
+        async function submitQuery() {
+            if (!indexBuilt) {
+                showStatus('✗ Please build the index first', 'warning');
+                return;
+            }
+
+            const question = document.getElementById('query-input').value.trim();
+            if (!question) {
                 showStatus('✗ Please enter a question', 'warning');
                 return;
             }
 
             try {
-                showStatus('Searching and generating answer...', 'info');
-                
-                const res = await fetch(API + "/query", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({question: q})
+                showStatus('Searching across documents...', 'info');
+
+                const res = await fetch(API + '/query', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question: question})
                 });
-                
+
                 const data = await res.json();
-                
+
                 if (data.success) {
-                    displayAnswer(data.data);
+                    displayQueryResults(data.data);
                     showStatus('', '');
                 } else {
-                    showStatus('✗ Error: ' + data.error, 'danger');
+                    showStatus('✗ ' + data.error, 'danger');
                 }
             } catch (error) {
                 showStatus('✗ Error: ' + error.message, 'danger');
             }
         }
 
-        // Display answer with sources
-        function displayAnswer(result) {
-            let html = '<div class="alert alert-success">';
-            html += '<h5>💬 Answer:</h5>';
-            html += '<p>' + result.answer + '</p>';
+        // Display query results with advanced formatting
+        function displayQueryResults(result) {
+            let html = `
+                <div class="answer-box mb-4">
+                    <h5 class="mb-3"><i class="bi bi-chat-quote"></i> Answer</h5>
+                    <p class="fs-5">${result.answer}</p>
+                    <div class="mt-3">
+                        <span class="badge bg-light text-dark">
+                            <i class="bi bi-clock"></i> ${new Date(result.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span class="badge bg-light text-dark ms-2">
+                            <i class="bi bi-file-earmark-text"></i> ${result.num_sources} source${result.num_sources !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                </div>
+
+                <h5 class="mb-3"><i class="bi bi-collection"></i> Sources</h5>
+                <div class="comparison-view">
+            `;
+
+            result.sources.forEach((source, idx) => {
+                const scorePercent = (source.score * 100).toFixed(0);
+                const scoreColor = source.score > 0.7 ? '#22c55e' : source.score > 0.5 ? '#eab308' : '#ef4444';
+
+                html += `
+                    <div class="source-card">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="mb-0">
+                                <i class="bi bi-file-earmark-text"></i>
+                                ${source.doc_name || 'Document'}
+                            </h6>
+                            <span class="score-badge">${scorePercent}%</span>
+                        </div>
+                        
+                        <div class="score-bar">
+                            <div class="score-fill" style="width: ${scorePercent}%; background: ${scoreColor};"></div>
+                        </div>
+
+                        <div class="mt-3">
+                            ${source.page_num !== 'N/A' ? `<span class="page-badge">Page ${source.page_num}</span>` : ''}
+                            <span class="page-badge">${source.pmcid}</span>
+                        </div>
+
+                        <p class="mt-3 mb-0" style="line-height: 1.6;">
+                            ${highlightRelevantText(source.text_snippet, result.question)}
+                        </p>
+                    </div>
+                `;
+            });
+
             html += '</div>';
 
-            if (result.sources && result.sources.length > 0) {
-                html += '<h6 class="mt-3">📚 Sources (' + result.num_sources + '):</h6>';
-                result.sources.forEach((source, idx) => {
-                    html += '<div class="source-card">';
-                    html += '<strong>' + (idx + 1) + '. ' + source.title + '</strong><br>';
-                    html += '<small class="text-muted">PMCID: ' + source.pmcid + ' | Relevance: ' + source.score.toFixed(3) + '</small><br>';
-                    html += '<p class="mt-2 mb-0">' + source.text_snippet + '</p>';
-                    html += '</div>';
-                });
-            }
-
-            document.getElementById("result").innerHTML = html;
+            document.getElementById('query-results').innerHTML = html;
         }
 
-        // Run RAGAS Evaluation
+        // Highlight relevant text
+        function highlightRelevantText(text, question) {
+            const keywords = question.toLowerCase().split(' ').filter(w => w.length > 3);
+            let highlighted = text;
+
+            keywords.forEach(keyword => {
+                const regex = new RegExp('(' + keyword + ')', 'gi');
+                highlighted = highlighted.replace(regex, '<span class="highlight-text">$1</span>');
+            });
+
+            return highlighted;
+        }
+
+        // Run evaluation
         async function runEvaluation() {
             if (!indexBuilt) {
-                showStatus('✗ Please build the index first in the Data & Index tab', 'warning');
+                showStatus('✗ Please build the index first', 'warning');
                 return;
             }
 
             try {
-                const button = document.getElementById('eval-button');
-                button.disabled = true;
-                button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running evaluation...';
-                
-                showStatus('Running RAGAS evaluation... This may take 1-2 minutes', 'info');
-                
-                const res = await fetch(API + "/evaluate", {method: "POST"});
+                const btn = document.getElementById('eval-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Evaluating...';
+
+                showStatus('Running RAGAS evaluation...', 'info');
+
+                const res = await fetch(API + '/evaluate', {method: 'POST'});
                 const data = await res.json();
-                
+
                 if (data.success) {
-                    displayEvaluationResults(data.data);
-                    showStatus('✓ Evaluation complete!', 'success');
+                    displayEvalResults(data.data);
+                    showStatus('✓ Evaluation complete', 'success');
                 } else {
-                    showStatus('✗ Error: ' + data.error, 'danger');
+                    showStatus('✗ ' + data.error, 'danger');
                 }
-                
-                button.disabled = false;
-                button.innerHTML = '▶️ Run RAGAS Evaluation';
+
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-play-circle"></i> Run Evaluation';
             } catch (error) {
                 showStatus('✗ Error: ' + error.message, 'danger');
-                document.getElementById('eval-button').disabled = false;
-                document.getElementById('eval-button').innerHTML = '▶️ Run RAGAS Evaluation';
+                document.getElementById('eval-btn').disabled = false;
             }
         }
 
         // Display evaluation results
-        function displayEvaluationResults(results) {
+        function displayEvalResults(results) {
             document.getElementById('metric-faith').textContent = results.faithfulness.toFixed(3);
             document.getElementById('metric-relevancy').textContent = results.answer_relevancy.toFixed(3);
             document.getElementById('metric-precision').textContent = results.context_precision.toFixed(3);
             document.getElementById('metric-recall').textContent = results.context_recall.toFixed(3);
 
-            // Add status badges
-            const metrics = {
-                'faith': results.faithfulness,
-                'relevancy': results.answer_relevancy,
-                'precision': results.context_precision,
-                'recall': results.context_recall
-            };
-
-            Object.entries(metrics).forEach(([key, value]) => {
-                const status = getScoreStatus(value);
-                document.getElementById('status-' + key).innerHTML = '<small>' + status + '</small>';
-            });
-
-            // Create chart
-            createEvaluationChart(results);
-
+            createEvalChart(results);
             document.getElementById('eval-results').style.display = 'block';
         }
 
-        // Get score status
-        function getScoreStatus(score) {
-            if (score >= 0.8) return '✓ Excellent';
-            if (score >= 0.6) return '○ Good';
-            if (score >= 0.4) return '△ Fair';
-            return '✗ Needs Improvement';
-        }
-
         // Create evaluation chart
-        function createEvaluationChart(data) {
+        function createEvalChart(data) {
             const ctx = document.getElementById('eval-chart');
-            
-            if (evalChart) {
-                evalChart.destroy();
-            }
+
+            if (evalChart) evalChart.destroy();
 
             evalChart = new Chart(ctx, {
                 type: 'bar',
@@ -491,59 +780,37 @@
                     labels: ['Faithfulness', 'Answer Relevancy', 'Context Precision', 'Context Recall'],
                     datasets: [{
                         label: 'Score',
-                        data: [
-                            data.faithfulness,
-                            data.answer_relevancy,
-                            data.context_precision,
-                            data.context_recall
-                        ],
-                        backgroundColor: [
-                            'rgba(13, 110, 253, 0.8)',
-                            'rgba(25, 135, 84, 0.8)',
-                            'rgba(255, 193, 7, 0.8)',
-                            'rgba(13, 202, 240, 0.8)'
-                        ]
+                        data: [data.faithfulness, data.answer_relevancy, data.context_precision, data.context_recall],
+                        backgroundColor: ['#0d6efd', '#198754', '#ffc107', '#0dcaf0']
                     }]
                 },
                 options: {
                     responsive: true,
                     scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 1,
-                            ticks: { stepSize: 0.2 }
-                        }
+                        y: { beginAtZero: true, max: 1 }
                     },
                     plugins: {
-                        legend: { display: false },
-                        title: {
-                            display: true,
-                            text: 'RAGAS Evaluation Metrics',
-                            font: { size: 16 }
-                        }
+                        legend: { display: false }
                     }
                 }
             });
         }
 
-        // Show status messages
+        // Show status
         function showStatus(message, type) {
             const statusDiv = document.getElementById('status-messages');
             if (!message) {
                 statusDiv.innerHTML = '';
                 return;
             }
-            statusDiv.innerHTML = '<div class="alert alert-' + type + '">' + message + '</div>';
-        }
+            statusDiv.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible fade show"><i class="bi bi-info-circle"></i> ' + message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
 
-        // Enter key support
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('query').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    query();
+            setTimeout(() => {
+                if (type === 'success' || type === 'info') {
+                    statusDiv.innerHTML = '';
                 }
-            });
-        });
+            }, 5000);
+        }
     </script>
 </body>
 </html>
